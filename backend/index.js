@@ -125,5 +125,43 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
+// Add Vendor endpoint
+app.post('/api/suppliers', async (req, res) => {
+  const { name, contact_name, email, phone, address } = req.body;
+  if (!name || !email || !phone || !address || !contact_name) {
+    return res.status(400).json({ error: 'Missing required fields.' });
+  }
+  try {
+    const result = await pool.query(
+      `INSERT INTO suppliers (name, contact_name, email, phone, address)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [name, contact_name, email, phone, address]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Add Product endpoint
+app.post('/api/products', async (req, res) => {
+  const { name, description, sku, unit_price, current_stock } = req.body;
+  if (!name || !description || !sku || unit_price == null || current_stock == null) {
+    return res.status(400).json({ error: 'Missing required fields.' });
+  }
+  try {
+    const result = await pool.query(
+      `INSERT INTO products (name, description, sku, unit_price, current_stock)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [name, description, sku, unit_price, current_stock]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
