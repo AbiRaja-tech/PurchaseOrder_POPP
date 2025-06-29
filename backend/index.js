@@ -25,23 +25,57 @@ app.post('/api/purchase-orders', async (req, res) => {
     order_date,
     expected_date,
     total_amount,
-    notes
+    items // array of { product_id, quantity, unit_price, total_price }
   } = req.body;
 
   // Basic validation
-  if (!supplier_id || !created_by || !po_number || !status || !order_date || !expected_date || !total_amount) {
-    return res.status(400).json({ error: 'Missing required fields.' });
+  if (!supplier_id || !created_by || !po_number || !status || !order_date || !expected_date || !total_amount || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'Missing required fields or items.' });
   }
 
+  const client = await pool.connect();
   try {
-    const result = await pool.query(
-      `INSERT INTO PurchaseOrders (supplier_id, created_by, po_number, status, order_date, expected_date, total_amount, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [supplier_id, created_by, po_number, status, order_date, expected_date, total_amount, notes || null]
+    await client.query('BEGIN');
+    // Insert PO
+    const userId = created_by;
+
+    const poRes = await client.query(
+      `INSERT INTO purchaseorders 
+        (supplier_id, created_by, po_number, status, order_date, expected_date, total_amount)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING po_id`,
+      [supplier_id, userId, po_number, status, order_date, expected_date, total_amount]
     );
-    res.status(201).json(result.rows[0]);
+    const purchaseOrderId = poRes.rows[0].po_id;
+
+    // Insert products/items
+    for (const item of items) {
+      const { product_id, quantity, unit_price, total_price } = item;
+      if (!product_id || !quantity || !unit_price || !total_price) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Invalid product/item fields.' });
+      }
+      await client.query(
+        `INSERT INTO purchaseorderitems 
+          (po_id, product_id, quantity, unit_price, total_price, received_qty)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          purchaseOrderId,
+          item.product_id,
+          item.quantity,
+          item.unit_price,
+          item.unit_price * item.quantity, // total_price
+          0 // received_qty, default to 0
+        ]
+      );
+    }
+    await client.query('COMMIT');
+    res.status(201).json({ po_id: purchaseOrderId });
   } catch (err) {
+    await client.query('ROLLBACK');
     res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -49,7 +83,43 @@ app.post('/api/purchase-orders', async (req, res) => {
 app.get('/api/purchase-orders', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM PurchaseOrders ORDER BY po_id DESC');
-    res.json(result.rows);
+    const pos = result.rows;
+    // For each PO, fetch its items
+    for (const po of pos) {
+      const itemsRes = await pool.query('SELECT * FROM purchaseorderitems WHERE po_id = $1', [po.po_id]);
+      po.items = itemsRes.rows;
+    }
+    res.json(pos);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Fetch all products
+app.get('/api/products', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM products');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Fetch all suppliers
+app.get('/api/suppliers', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM suppliers');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Fetch all users
+app.get('/api/users', async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM users');
+    res.json(rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

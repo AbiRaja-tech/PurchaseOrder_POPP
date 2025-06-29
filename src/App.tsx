@@ -7,6 +7,8 @@ import {
 } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { Box, CircularProgress } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 // Local Imports
 import { useAuth } from './hooks/useAuth';
@@ -69,34 +71,36 @@ const App: React.FC = () => {
   }
 
   return (
-    <Routes>
-      {/* Public route for login */}
-      <Route
-        path="/login"
-        element={user ? <Navigate to="/dashboard" replace /> : <Login />}
-      />
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Routes>
+        {/* Public route for login */}
+        <Route
+          path="/login"
+          element={user ? <Navigate to="/dashboard" replace /> : <Login />}
+        />
 
-      {/* Protected Routes */}
-      <Route element={<ProtectedRoutes />}>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/purchase-orders" element={<PurchaseOrders />} />
-        <Route path="/vendors" element={<Vendors />} />
-        <Route path="/invoices" element={<Invoices />} />
-        <Route path="/products" element={<Products />} />
-        <Route path="/ai-assistant" element={<AIAssistant />} />
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/access-denied" element={<AccessDenied />} />
-        
-        {/* Admin Only Route */}
-        <Route element={<AdminRoute />}>
-          <Route path="/settings" element={<Settings />} />
+        {/* Protected Routes */}
+        <Route element={<ProtectedRoutes />}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/purchase-orders" element={<PurchaseOrders />} />
+          <Route path="/vendors" element={<Vendors />} />
+          <Route path="/invoices" element={<Invoices />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/ai-assistant" element={<AIAssistant />} />
+          <Route path="/analytics" element={<Analytics />} />
+          <Route path="/access-denied" element={<AccessDenied />} />
+          
+          {/* Admin Only Route */}
+          <Route element={<AdminRoute />}>
+            <Route path="/settings" element={<Settings />} />
+          </Route>
         </Route>
-      </Route>
 
-      {/* Not Found Route */}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+        {/* Not Found Route */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </LocalizationProvider>
   );
 };
 
